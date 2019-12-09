@@ -1,9 +1,7 @@
-
 import java.util.Scanner;
 import java.io.*;
 
-public class BookInfo{
-
+public class BookInfo {
 	public static String[] getBookNames() throws IOException {
 		int count=0;
 		final int SIZE = 7;
@@ -18,13 +16,12 @@ public class BookInfo{
 			String str;
 
 			str= inputFile.nextLine();
-
 			String[] parts = str.split(",");
 			books[count]=parts[0];
 		 	count++;
 		}
+		
 		inputFile.close();
-
 		return books;
 	}
 
