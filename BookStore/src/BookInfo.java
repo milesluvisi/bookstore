@@ -7,8 +7,8 @@ import java.util.ArrayList;
 
 public class BookInfo {
 	
-	Connection con;
-	static Statement stmt;
+	private Connection con;
+	private static Statement stmt;
 	
 	public BookInfo(Connection con) {
 		this.con = con;
@@ -19,6 +19,26 @@ public class BookInfo {
 		}
 	}
 	
+	//	TODO
+	public void placeOrder(double total, ArrayList<Integer> bookISBNs, 
+			ArrayList<Integer> amounts) throws Exception {
+		String sql = String.format("INSERT INTO Orders(status, price) "
+				+ "values('Placed', %.2f);", total);
+		stmt.executeUpdate(sql);
+		
+		sql = "SELECT oid FROM Orders";
+		ResultSet oidList = stmt.executeQuery(sql);
+		oidList.last();
+		int oid = oidList.getInt("oid");
+		
+		if (bookISBNs.size() != amounts.size()) {throw new Exception("List length mismatch");}
+		for (int i=0; i<bookISBNs.size(); i++) {
+			sql = String.format("INSERT INTO Ordering(isbn, oid, amount) "
+					+ "values(%d, %d, %d);", bookISBNs.get(i), oid, amounts.get(i));
+			stmt.executeUpdate(sql);
+		}
+
+	}
 	
 	public ArrayList<String> getBookNames() throws IOException, SQLException {
 		String sql = "SELECT title FROM Books";
@@ -28,27 +48,6 @@ public class BookInfo {
 			strArray.add(results.getString("title"));
 		}
 		return strArray;
-		
-//		int count=0;
-//		final int SIZE = 7;
-//
-//		String[] books = new String[SIZE];
-//
-//		File myFile = new File("BookPrices.txt");
-//		Scanner inputFile = new Scanner(myFile);
-//
-//		while(inputFile.hasNext() && count < books.length)
-//		{
-//			String str;
-//
-//			str= inputFile.nextLine();
-//			String[] parts = str.split(",");
-//			books[count]=parts[0];
-//		 	count++;
-//		}
-//		
-//		inputFile.close();
-//		return books;
 	}
 
 	public ArrayList<Double> getBookPrices() throws IOException, SQLException {
@@ -59,27 +58,6 @@ public class BookInfo {
 			strArray.add(results.getDouble("price"));
 		}
 		return strArray;
-		
-//		int count=0;
-//		final int SIZE = 7;
-//		double[] prices = new double[SIZE];
-//
-//		File myFile = new File("BookPrices.txt");
-//		Scanner inputFile = new Scanner(myFile);
-//
-//		while(inputFile.hasNext() && count < prices.length)
-//		{
-//			String str;
-//
-//			str = inputFile.nextLine();
-//			String[] parts = str.split(",");
-//
-//		 	prices[count]= Double.parseDouble(parts[1]) ;
-//		 	count++;
-//		}
-//		inputFile.close();
-//
-//		return prices;
 	}
 
 }

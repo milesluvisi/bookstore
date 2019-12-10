@@ -7,7 +7,9 @@ import java.awt.event.ActionListener;
 import java.io.IOException;
 import java.sql.Connection;
 import java.sql.DriverManager;
+import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Statement;
 import java.text.DecimalFormat;
 import java.util.ArrayList;
 
@@ -30,7 +32,8 @@ public class BookStoreGUI extends JFrame {
 	static final String DB_USER = "root";
 	static final String DB_PASS = "FinalProject4523";	//	EDIT THIS LINE
 	
-	static Connection con;
+	private static Connection con;
+	private static Statement stmt;
 
 	private static final int WINDOW_WIDTH= 750;
 	private static final int WINDOW_LENGTH = 500;
@@ -41,7 +44,7 @@ public class BookStoreGUI extends JFrame {
 	private JPanel bannerPanel;			
 	private JPanel searchButtonsPanel;	
 	private JList<String> booksList;			
-	private JList<Object> selectedList;			
+	private JList<Object> cartList;			
 
 	private JButton addSelected;		
 	private JButton removeSelected;		
@@ -67,13 +70,13 @@ public class BookStoreGUI extends JFrame {
 	private int index;					
 	private int i,count;				
 
-	private double total;				
-	private double bookPrice;			
+	private double totalWithTax;				
+	private double totalPrice;			
 	private final double TAX=0.06;		
 
 	private ListModel<String> books;			
 	private ListModel<Object> shoppingCart;		
-	private DefaultListModel<Object> shoppingCartDFM;
+	protected DefaultListModel<Object> shoppingCartDLM;
 
 	private DecimalFormat money;		
 	private Object selectedBookName; 	
@@ -87,6 +90,9 @@ public class BookStoreGUI extends JFrame {
 		booksInfo = new BookInfo(con2);
 		bookNames = booksInfo.getBookNames();	
 		bookPrices = booksInfo.getBookPrices();
+		
+		con = con2;
+		stmt = con.createStatement();
 		
 		setTitle("Database Project");
 		setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
@@ -141,10 +147,10 @@ public class BookStoreGUI extends JFrame {
 	public void buildShoppingCartPanel() {
 		shoppingCartPanel = new JPanel();
 		shoppingCartPanel.setLayout(new BorderLayout());
-		selectedList = new JList<Object>();
-		selectedList.setVisibleRowCount(5);
-		scrollPane2 = new JScrollPane(selectedList);
-		scrollPane2.setPreferredSize(new Dimension(175,50));
+		cartList = new JList<Object>();
+		cartList.setVisibleRowCount(5);
+		scrollPane2 = new JScrollPane(cartList);
+		scrollPane2.setPreferredSize(new Dimension(175,175));
 		cartTitle = new JLabel("Shopping Cart");
 
 		shoppingCartPanel.add(cartTitle, BorderLayout.NORTH);
@@ -175,7 +181,6 @@ public class BookStoreGUI extends JFrame {
 		searchButtonsPanel.add(showAllButton);
 	}
 
-	//TODO: Change all the listeners to interact based on a database rather than a txt file
 	public class AddButtonListener implements ActionListener {
 		public void actionPerformed(ActionEvent e) {
 
@@ -183,52 +188,74 @@ public class BookStoreGUI extends JFrame {
 			selectedBookName = booksList.getSelectedValue();
 
 			books = booksList.getModel();
-			shoppingCart = selectedList.getModel();
+			shoppingCart = cartList.getModel();
 
-			shoppingCartDFM = new DefaultListModel<Object>();
+			shoppingCartDLM = new DefaultListModel<Object>();
 
 			for(count=0; count<shoppingCart.getSize(); count++){
-				shoppingCartDFM.addElement(shoppingCart.getElementAt(count));
+				shoppingCartDLM.addElement(shoppingCart.getElementAt(count));
 			}
 
 			if(element == -1)
-				bookPrice += bookPrices.get(selectedIndex);
+				totalPrice += bookPrices.get(selectedIndex);
 			else
-				bookPrice += bookPrices.get(element);
+				totalPrice += bookPrices.get(element);
 
-			shoppingCartDFM.addElement(selectedBookName);
-			selectedList.setModel(shoppingCartDFM);
+			shoppingCartDLM.addElement(selectedBookName);
+			cartList.setModel(shoppingCartDLM);
 		}
 	}
 
 	public class RemoveButtonListener implements ActionListener {
 		public void actionPerformed(ActionEvent e) {
-
-			index = selectedList.getSelectedIndex();
-			((DefaultListModel<Object>)selectedList.getModel()).remove(index);
+			index = cartList.getSelectedIndex();
+			((DefaultListModel<Object>)cartList.getModel()).remove(index);
 
 			if(element == -1)
-				if(bookPrices.get(selectedIndex) <= bookPrice)
-					bookPrice -= (bookPrices.get(selectedIndex));
+				if(bookPrices.get(selectedIndex) <= totalPrice)
+					totalPrice -= (bookPrices.get(selectedIndex));
 				else
-					bookPrice = (bookPrices.get(index)) - bookPrice;
+					totalPrice = (bookPrices.get(index)) - totalPrice;
 			else
-				if(bookPrices.get(element) <= bookPrice)
-					bookPrice -= (bookPrices.get(element));
+				if(bookPrices.get(element) <= totalPrice)
+					totalPrice -= (bookPrices.get(element));
 				else
-					bookPrice = (bookPrices.get(index)) - bookPrice;
+					totalPrice = (bookPrices.get(index)) - totalPrice;
 		}
 	}
 
+	//	TODO adding to Ordering table
 	public class CheckOutButtonListener implements ActionListener { 
 		public void actionPerformed(ActionEvent e) {
-
 			money = new DecimalFormat("#,##0.00");
-			total = (bookPrice + (bookPrice*TAX));
-
-			JOptionPane.showMessageDialog(null, "Subtotal: $" + (money.format(bookPrice)) + "\n" +
-												"Tax: $" + (money.format((bookPrice*TAX))) + "\n" +
-												"Total: $" + (money.format(total)));
+			totalWithTax = (totalPrice + (totalPrice*TAX));
+			
+			Object[] checkoutBooks = shoppingCartDLM.toArray();
+			//	TODO
+			try {
+				String sql = "SELECT * FROM Books";
+				ResultSet results = stmt.executeQuery(sql);
+				ArrayList<Integer> isbnList = new ArrayList<Integer>();
+				ArrayList<Integer> countList = new ArrayList<Integer>();
+	
+				while(results.next()) {
+					isbnList.add(results.getInt("isbn"));
+					countList.add(0);
+					for (Object book : checkoutBooks) {
+						if (results.getString("title") == book.toString()) {
+							countList.get(results.getRow());
+						}
+					}
+				}
+				
+				booksInfo.placeOrder(totalWithTax, isbnList, countList);
+			} catch (Exception sqle) {
+				sqle.printStackTrace();
+			}
+			
+			JOptionPane.showMessageDialog(null, "Subtotal: $" + (money.format(totalPrice)) + "\n" +
+												"Tax: $" + (money.format((totalPrice*TAX))) + "\n" +
+												"Total: $" + (money.format(totalWithTax)));
 		}
 	}
 
@@ -285,7 +312,6 @@ public class BookStoreGUI extends JFrame {
 		 } catch (SQLException e2) {
 			 e2.printStackTrace();
 		 }
-		 
 		 new BookStoreGUI(con);
 		 
 	 }
