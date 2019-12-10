@@ -1,24 +1,47 @@
-import java.awt.*;
-import java.awt.event.*;
-import java.util.Scanner;
-import java.io.*;
-import javax.swing.JOptionPane;
-import javax.swing.DefaultListModel;
-import javax.swing.*;
+import java.awt.BorderLayout;
+import java.awt.Dimension;
+import java.awt.Font;
+import java.awt.GridLayout;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
+import java.io.IOException;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.SQLException;
 import java.text.DecimalFormat;
+import java.util.ArrayList;
+
+import javax.swing.DefaultListModel;
+import javax.swing.JButton;
+import javax.swing.JFrame;
+import javax.swing.JLabel;
+import javax.swing.JList;
+import javax.swing.JOptionPane;
+import javax.swing.JPanel;
+import javax.swing.JScrollPane;
+import javax.swing.JTextField;
+import javax.swing.ListModel;
+import javax.swing.ListSelectionModel;
 
 public class BookStoreGUI extends JFrame {
+	
+	static final String JDBC_Driver = "com.mysql.cj.jdbc.Driver";
+	static final String DB_URL = "jdbc:mysql://localhost:3306/bookstore";
+	static final String DB_USER = "root";
+	static final String DB_PASS = "FinalProject4523";	//	EDIT THIS LINE
+	
+	static Connection con;
 
 	private static final int WINDOW_WIDTH= 750;
-	private static final int WINDOW_LENGTH = 250;
+	private static final int WINDOW_LENGTH = 500;
 
 	private JPanel booksPanel;			
 	private JPanel buttonsPanel;		
 	private JPanel shoppingCartPanel;	
 	private JPanel bannerPanel;			
 	private JPanel searchButtonsPanel;	
-	private JList booksList;			
-	private JList selectedList;			
+	private JList<String> booksList;			
+	private JList<Object> selectedList;			
 
 	private JButton addSelected;		
 	private JButton removeSelected;		
@@ -26,9 +49,9 @@ public class BookStoreGUI extends JFrame {
 	private JButton searchButton;		
 	private JButton showAllButton;		
 
-	private BookInfo booksInfo = new BookInfo(); 			
-	private String[] bookNames = booksInfo.getBookNames();	
-	private double[] bookPrices = booksInfo.getBookPrices();
+	private BookInfo booksInfo; 			
+	private ArrayList<String> bookNames;	
+	private ArrayList<Double> bookPrices;
 
 	private JScrollPane scrollPane1;	
 	private JScrollPane scrollPane2;	
@@ -48,9 +71,9 @@ public class BookStoreGUI extends JFrame {
 	private double bookPrice;			
 	private final double TAX=0.06;		
 
-	private ListModel books;			
-	private ListModel shoppingCart;		
-	private DefaultListModel shoppingCartDFM;
+	private ListModel<String> books;			
+	private ListModel<Object> shoppingCart;		
+	private DefaultListModel<Object> shoppingCartDFM;
 
 	private DecimalFormat money;		
 	private Object selectedBookName; 	
@@ -59,7 +82,12 @@ public class BookStoreGUI extends JFrame {
 	private String notFound = " Title not found";	
 	private boolean found = false;
 
-	public BookStoreGUI() throws IOException {
+	public BookStoreGUI(Connection con2) throws IOException, SQLException {
+		
+		booksInfo = new BookInfo(con2);
+		bookNames = booksInfo.getBookNames();	
+		bookPrices = booksInfo.getBookPrices();
+		
 		setTitle("Database Project");
 		setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 		setLayout(new BorderLayout());
@@ -84,7 +112,7 @@ public class BookStoreGUI extends JFrame {
 	public void buildBooksPanel() {
 		booksPanel = new JPanel();
 		booksPanel.setLayout(new BorderLayout());
-		booksList = new JList(bookNames);
+		booksList = new JList(bookNames.toArray());
 		booksList.setSelectionMode(ListSelectionModel.SINGLE_INTERVAL_SELECTION);
 		booksList.setVisibleRowCount(5);
 		scrollPane1 = new JScrollPane(booksList);
@@ -113,7 +141,7 @@ public class BookStoreGUI extends JFrame {
 	public void buildShoppingCartPanel() {
 		shoppingCartPanel = new JPanel();
 		shoppingCartPanel.setLayout(new BorderLayout());
-		selectedList = new JList();
+		selectedList = new JList<Object>();
 		selectedList.setVisibleRowCount(5);
 		scrollPane2 = new JScrollPane(selectedList);
 		scrollPane2.setPreferredSize(new Dimension(175,50));
@@ -157,16 +185,16 @@ public class BookStoreGUI extends JFrame {
 			books = booksList.getModel();
 			shoppingCart = selectedList.getModel();
 
-			shoppingCartDFM = new DefaultListModel();
+			shoppingCartDFM = new DefaultListModel<Object>();
 
 			for(count=0; count<shoppingCart.getSize(); count++){
 				shoppingCartDFM.addElement(shoppingCart.getElementAt(count));
 			}
 
 			if(element == -1)
-				bookPrice += bookPrices[selectedIndex];
+				bookPrice += bookPrices.get(selectedIndex);
 			else
-				bookPrice += bookPrices[element];
+				bookPrice += bookPrices.get(element);
 
 			shoppingCartDFM.addElement(selectedBookName);
 			selectedList.setModel(shoppingCartDFM);
@@ -177,18 +205,18 @@ public class BookStoreGUI extends JFrame {
 		public void actionPerformed(ActionEvent e) {
 
 			index = selectedList.getSelectedIndex();
-			((DefaultListModel)selectedList.getModel()).remove(index);
+			((DefaultListModel<Object>)selectedList.getModel()).remove(index);
 
 			if(element == -1)
-				if(bookPrices[selectedIndex] <= bookPrice)
-					bookPrice -= (bookPrices[selectedIndex]);
+				if(bookPrices.get(selectedIndex) <= bookPrice)
+					bookPrice -= (bookPrices.get(selectedIndex));
 				else
-					bookPrice = (bookPrices[index]) - bookPrice;
+					bookPrice = (bookPrices.get(index)) - bookPrice;
 			else
-				if(bookPrices[element] <= bookPrice)
-					bookPrice -= (bookPrices[element]);
+				if(bookPrices.get(element) <= bookPrice)
+					bookPrice -= (bookPrices.get(element));
 				else
-					bookPrice = (bookPrices[index]) - bookPrice;
+					bookPrice = (bookPrices.get(index)) - bookPrice;
 		}
 	}
 
@@ -209,9 +237,9 @@ public class BookStoreGUI extends JFrame {
 
 			index = 0;
 
-			while(!found && index < bookNames.length)
+			while(!found && index < bookNames.size())
 			{
-				if(bookNames[index].equals(searchField.getText())){
+				if(bookNames.get(index).equals(searchField.getText())){
 					found = true;
 					element = index;
 				}
@@ -219,14 +247,14 @@ public class BookStoreGUI extends JFrame {
 			}
 
 			if(element == -1){
-				booksList.setModel(new DefaultListModel());
-				((DefaultListModel)booksList.getModel()).addElement(notFound);
+				booksList.setModel(new DefaultListModel<String>());
+				((DefaultListModel<String>)booksList.getModel()).addElement(notFound);
 			}
 			else{
-				searchResults = bookNames[element];
-				booksList.setModel(new DefaultListModel());
+				searchResults = bookNames.get(element);
+				booksList.setModel(new DefaultListModel<String>());
 
-				((DefaultListModel)booksList.getModel()).addElement(searchResults);
+				((DefaultListModel<String>)booksList.getModel()).addElement(searchResults);
 			}
 		}
 	}
@@ -234,17 +262,31 @@ public class BookStoreGUI extends JFrame {
 	public class ShowAllButtonListener implements ActionListener {
 		public void actionPerformed(ActionEvent e) {
 
-			booksList.setModel(new DefaultListModel());
+			booksList.setModel(new DefaultListModel<String>());
 			
-			for(i=0; i < bookNames.length; i++){
-				((DefaultListModel)booksList.getModel()).addElement(bookNames[i]);
+			for(i=0; i < bookNames.size(); i++){
+				((DefaultListModel<String>)booksList.getModel()).addElement(bookNames.get(i));
 				 
 			}
 		}
 	}
 
-	 public static void main(String[] args) throws IOException {
-
-		 new BookStoreGUI();
+	 public static void main(String[] args) throws IOException, SQLException {
+		 
+		 Connection con = null;
+		 try {
+				Class.forName(JDBC_Driver);
+			} catch (ClassNotFoundException e1) {
+				e1.printStackTrace();
+			}
+		 try {
+			 con = DriverManager.getConnection(DB_URL, DB_USER, DB_PASS);
+			 System.out.println("Connection successful");
+		 } catch (SQLException e2) {
+			 e2.printStackTrace();
+		 }
+		 
+		 new BookStoreGUI(con);
+		 
 	 }
  }
