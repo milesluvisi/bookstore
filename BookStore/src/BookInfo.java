@@ -19,9 +19,8 @@ public class BookInfo {
 		}
 	}
 	
-	//	TODO
-	public void placeOrder(double total, ArrayList<Integer> bookISBNs, 
-			ArrayList<Integer> amounts) throws Exception {
+	public void placeOrder(double total, ResultSet bookResults, 
+			int[] countList) throws Exception {
 		String sql = String.format("INSERT INTO Orders(status, price) "
 				+ "values('Placed', %.2f);", total);
 		stmt.executeUpdate(sql);
@@ -31,13 +30,18 @@ public class BookInfo {
 		oidList.last();
 		int oid = oidList.getInt("oid");
 		
-		if (bookISBNs.size() != amounts.size()) {throw new Exception("List length mismatch");}
-		for (int i=0; i<bookISBNs.size(); i++) {
-			sql = String.format("INSERT INTO Ordering(isbn, oid, amount) "
-					+ "values(%d, %d, %d);", bookISBNs.get(i), oid, amounts.get(i));
-			stmt.executeUpdate(sql);
+		int i = 0;
+		bookResults.beforeFirst();
+		while (bookResults.next()) {
+			if (countList[i] != 0) {
+				sql = String.format("INSERT INTO Ordering(isbn, oid, amount) "
+						+ "values(%d, %d, %d);", bookResults.getInt("isbn"), oid, countList[i]);
+				stmt.executeUpdate(sql);
+				sql = String.format("UPDATE books SET instock=instock-%d WHERE isbn=%d", countList[i], bookResults.getInt("isbn"));
+				stmt.executeUpdate(sql);
+			}
+			i++;
 		}
-
 	}
 	
 	public ArrayList<String> getBookNames() throws IOException, SQLException {

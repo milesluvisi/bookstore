@@ -61,29 +61,24 @@ public class BookStoreGUI extends JFrame {
 
 	private JLabel panelTitle;			
 	private JLabel cartTitle;			
-	private JLabel banner;				
 
 	private JTextField searchField;		
 
-	private int element = -1;			
 	private int selectedIndex;			
 	private int index;					
 	private int i,count;				
 
 	private double totalWithTax;				
 	private double totalPrice;			
-	private final double TAX=0.06;		
+	private final double TAX = 0.06;		
 
-	private ListModel<String> books;			
 	private ListModel<Object> shoppingCart;		
 	protected DefaultListModel<Object> shoppingCartDLM;
 
 	private DecimalFormat money;		
 	private Object selectedBookName; 	
 
-	private String searchResults;		
-	private String notFound = " Title not found";	
-	private boolean found = false;
+	private String notFound = "Title not found";	
 
 	public BookStoreGUI(Connection con2) throws IOException, SQLException {
 		
@@ -115,6 +110,7 @@ public class BookStoreGUI extends JFrame {
 		pack();
 	}
 
+	@SuppressWarnings({ "unchecked", "rawtypes" })
 	public void buildBooksPanel() {
 		booksPanel = new JPanel();
 		booksPanel.setLayout(new BorderLayout());
@@ -187,7 +183,6 @@ public class BookStoreGUI extends JFrame {
 			selectedIndex = booksList.getSelectedIndex();
 			selectedBookName = booksList.getSelectedValue();
 
-			books = booksList.getModel();
 			shoppingCart = cartList.getModel();
 
 			shoppingCartDLM = new DefaultListModel<Object>();
@@ -196,10 +191,7 @@ public class BookStoreGUI extends JFrame {
 				shoppingCartDLM.addElement(shoppingCart.getElementAt(count));
 			}
 
-			if(element == -1)
-				totalPrice += bookPrices.get(selectedIndex);
-			else
-				totalPrice += bookPrices.get(element);
+			totalPrice += bookPrices.get(selectedIndex);
 
 			shoppingCartDLM.addElement(selectedBookName);
 			cartList.setModel(shoppingCartDLM);
@@ -208,47 +200,52 @@ public class BookStoreGUI extends JFrame {
 
 	public class RemoveButtonListener implements ActionListener {
 		public void actionPerformed(ActionEvent e) {
-			index = cartList.getSelectedIndex();
-			((DefaultListModel<Object>)cartList.getModel()).remove(index);
-
-			if(element == -1)
-				if(bookPrices.get(selectedIndex) <= totalPrice)
-					totalPrice -= (bookPrices.get(selectedIndex));
-				else
-					totalPrice = (bookPrices.get(index)) - totalPrice;
-			else
-				if(bookPrices.get(element) <= totalPrice)
-					totalPrice -= (bookPrices.get(element));
-				else
-					totalPrice = (bookPrices.get(index)) - totalPrice;
+			selectedIndex = cartList.getSelectedIndex();
+			String title = (String)(cartList.getModel().getElementAt(selectedIndex));
+			double price = bookPrices.get(bookNames.indexOf(title));
+			
+			((DefaultListModel<Object>)cartList.getModel()).remove(selectedIndex);
+			
+			totalPrice -= price;
 		}
 	}
-
-	//	TODO adding to Ordering table
+	//	TODO: update instock and Ordering table not working correctly
 	public class CheckOutButtonListener implements ActionListener { 
 		public void actionPerformed(ActionEvent e) {
 			money = new DecimalFormat("#,##0.00");
-			totalWithTax = (totalPrice + (totalPrice*TAX));
+			totalWithTax = totalPrice*(1+TAX);
 			
 			Object[] checkoutBooks = shoppingCartDLM.toArray();
-			//	TODO
+			
 			try {
 				String sql = "SELECT * FROM Books";
-				ResultSet results = stmt.executeQuery(sql);
-				ArrayList<Integer> isbnList = new ArrayList<Integer>();
-				ArrayList<Integer> countList = new ArrayList<Integer>();
-	
-				while(results.next()) {
-					isbnList.add(results.getInt("isbn"));
-					countList.add(0);
-					for (Object book : checkoutBooks) {
-						if (results.getString("title") == book.toString()) {
-							countList.get(results.getRow());
-						}
-					}
+				ResultSet bookResults = stmt.executeQuery(sql);
+				
+				int size = 0;
+				if (bookResults != null) 
+				{
+				  bookResults.last();    // moves cursor to the last row
+				  size = bookResults.getRow(); // get row id 
+				  bookResults.beforeFirst();
 				}
 				
-				booksInfo.placeOrder(totalWithTax, isbnList, countList);
+				ArrayList<Integer> isbnList = new ArrayList<Integer>();
+				int[] countList = new int[size];
+				int index = 0;
+				while (bookResults.next()) {
+					String dbBookTitle = bookResults.getString("title").trim();
+					for (Object cartBook : checkoutBooks) {
+						if (dbBookTitle.equals(cartBook)) {
+							if (!(isbnList.contains(bookResults.getInt("isbn")))) {
+								isbnList.add(bookResults.getInt("isbn"));							
+							}	
+							countList[index] += 1;
+						}
+					}
+					index++;
+				}
+				
+				booksInfo.placeOrder(totalWithTax, bookResults, countList);
 			} catch (Exception sqle) {
 				sqle.printStackTrace();
 			}
@@ -264,31 +261,28 @@ public class BookStoreGUI extends JFrame {
 
 			index = 0;
 
-			while(!found && index < bookNames.size())
-			{
-				if(bookNames.get(index).equals(searchField.getText())){
-					found = true;
-					element = index;
+			for (@SuppressWarnings("unused") String name : bookNames) {
+				if (bookNames.get(index).equals(searchField.getText())) {
+					break;
 				}
 				index++;
 			}
-
-			if(element == -1){
-				booksList.setModel(new DefaultListModel<String>());
+			
+			booksList.setModel(new DefaultListModel<String>());
+			if (index >= booksList.getSize().height) {
 				((DefaultListModel<String>)booksList.getModel()).addElement(notFound);
 			}
-			else{
-				searchResults = bookNames.get(element);
-				booksList.setModel(new DefaultListModel<String>());
-
-				((DefaultListModel<String>)booksList.getModel()).addElement(searchResults);
+			else {
+				((DefaultListModel<String>)booksList.getModel()).addElement(searchField.getText());
 			}
+			
 		}
 	}
 
 	public class ShowAllButtonListener implements ActionListener {
 		public void actionPerformed(ActionEvent e) {
 
+			searchField.setText(null);
 			booksList.setModel(new DefaultListModel<String>());
 			
 			for(i=0; i < bookNames.size(); i++){
