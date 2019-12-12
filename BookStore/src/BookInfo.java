@@ -37,7 +37,7 @@ public class BookInfo {
 				sql = String.format("INSERT INTO Ordering(isbn, oid, amount) "
 						+ "values(%d, %d, %d);", bookResults.getInt("isbn"), oid, countList[i]);
 				stmt.executeUpdate(sql);
-				sql = String.format("UPDATE books SET instock=instock-%d WHERE isbn=%d", countList[i], bookResults.getInt("isbn"));
+				sql = String.format("UPDATE books SET instock=instock-%d WHERE isbn=%d and instock>0", countList[i], bookResults.getInt("isbn"));
 				stmt.executeUpdate(sql);
 			}
 			i++;
